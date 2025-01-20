@@ -47,6 +47,7 @@ GET_MARKET = "/markets/"
 GET_MARKET_TRADES_EVENTS = "/live-activity/events/"
 POST_HEARTBEAT = "/v1/heartbeats"
 GET_BUILDER_TRADES = "/builder/trades"
+GET_PRICE_HISTORY = "/prices-history"
 
 # RFQ Endpoints
 CREATE_RFQ_REQUEST = "/rfq/request"
