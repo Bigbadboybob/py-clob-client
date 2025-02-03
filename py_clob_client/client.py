@@ -1,6 +1,9 @@
 import logging
 import json
 from typing import Optional
+import json
+import asyncio
+import websockets
 
 from py_builder_signing_sdk.config import BuilderConfig
 
@@ -191,21 +194,21 @@ class ClobClient:
         if contract_config:
             return contract_config.exchange
 
-    def get_ok(self):
+    async def get_ok(self):
         """
         Health check: Confirms that the server is up
         Does not need authentication
         """
-        return get("{}/".format(self.host))
+        return await get("{}/".format(self.host))
 
-    def get_server_time(self):
+    async def get_server_time(self):
         """
         Returns the current timestamp on the server
         Does not need authentication
         """
-        return get("{}{}".format(self.host, TIME))
+        return await get("{}{}".format(self.host, TIME))
 
-    def create_api_key(self, nonce: int = None) -> ApiCreds:
+    async def create_api_key(self, nonce: int = None) -> ApiCreds:
         """
         Creates a new CLOB API key for the given
         """
@@ -214,7 +217,7 @@ class ClobClient:
         endpoint = "{}{}".format(self.host, CREATE_API_KEY)
         headers = create_level_1_headers(self.signer, nonce)
 
-        creds_raw = post(endpoint, headers=headers)
+        creds_raw = await post(endpoint, headers=headers)
         try:
             creds = ApiCreds(
                 api_key=creds_raw["apiKey"],
@@ -226,7 +229,7 @@ class ClobClient:
             return None
         return creds
 
-    def derive_api_key(self, nonce: int = None) -> ApiCreds:
+    async def derive_api_key(self, nonce: int = None) -> ApiCreds:
         """
         Derives an already existing CLOB API key for the given address and nonce
         """
@@ -235,7 +238,7 @@ class ClobClient:
         endpoint = "{}{}".format(self.host, DERIVE_API_KEY)
         headers = create_level_1_headers(self.signer, nonce)
 
-        creds_raw = get(endpoint, headers=headers)
+        creds_raw = await get(endpoint, headers=headers)
         try:
             creds = ApiCreds(
                 api_key=creds_raw["apiKey"],
@@ -247,14 +250,14 @@ class ClobClient:
             return None
         return creds
 
-    def create_or_derive_api_creds(self, nonce: int = None) -> ApiCreds:
+    async def create_or_derive_api_creds(self, nonce: int = None) -> ApiCreds:
         """
         Creates API creds if not already created for nonce, otherwise derives them
         """
         try:
-            return self.create_api_key(nonce)
+            return await self.create_api_key(nonce)
         except:
-            return self.derive_api_key(nonce)
+            return await self.derive_api_key(nonce)
 
     def set_api_creds(self, creds: ApiCreds):
         """
@@ -263,7 +266,7 @@ class ClobClient:
         self.creds = creds
         self.mode = self._get_client_mode()
 
-    def get_api_keys(self):
+    async def get_api_keys(self):
         """
         Gets the available API keys for this address
         Level 2 Auth required
@@ -272,9 +275,9 @@ class ClobClient:
 
         request_args = RequestArgs(method="GET", request_path=GET_API_KEYS)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return get("{}{}".format(self.host, GET_API_KEYS), headers=headers)
+        return await get("{}{}".format(self.host, GET_API_KEYS), headers=headers)
 
-    def get_closed_only_mode(self):
+    async def get_closed_only_mode(self):
         """
         Gets the closed only mode flag for thsi address
         Level 2 Auth required
@@ -283,9 +286,9 @@ class ClobClient:
 
         request_args = RequestArgs(method="GET", request_path=CLOSED_ONLY)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return get("{}{}".format(self.host, CLOSED_ONLY), headers=headers)
+        return await get("{}{}".format(self.host, CLOSED_ONLY), headers=headers)
 
-    def delete_api_key(self):
+    async def delete_api_key(self):
         """
         Deletes an API key
         Level 2 Auth required
@@ -294,9 +297,9 @@ class ClobClient:
 
         request_args = RequestArgs(method="DELETE", request_path=DELETE_API_KEY)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete("{}{}".format(self.host, DELETE_API_KEY), headers=headers)
+        return await delete("{}{}".format(self.host, DELETE_API_KEY), headers=headers)
 
-    def create_readonly_api_key(self) -> ReadonlyApiKeyResponse:
+async def create_readonly_api_key(self) -> ReadonlyApiKeyResponse:
         """
         Creates a new readonly API key for a user
         Level 2 Auth required
@@ -306,14 +309,14 @@ class ClobClient:
         request_args = RequestArgs(method="POST", request_path=CREATE_READONLY_API_KEY)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
 
-        response = post("{}{}".format(self.host, CREATE_READONLY_API_KEY), headers=headers)
+        response = await post("{}{}".format(self.host, CREATE_READONLY_API_KEY), headers=headers)
         try:
             return ReadonlyApiKeyResponse(api_key=response["apiKey"])
         except:
             self.logger.error("Couldn't parse readonly API key response")
             return None
 
-    def get_readonly_api_keys(self) -> list[str]:
+    async def get_readonly_api_keys(self) -> list[str]:
         """
         Gets the available readonly API keys for this address
         Level 2 Auth required
@@ -322,9 +325,9 @@ class ClobClient:
 
         request_args = RequestArgs(method="GET", request_path=GET_READONLY_API_KEYS)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return get("{}{}".format(self.host, GET_READONLY_API_KEYS), headers=headers)
+        return await get("{}{}".format(self.host, GET_READONLY_API_KEYS), headers=headers)
 
-    def delete_readonly_api_key(self, key: str) -> bool:
+    async def delete_readonly_api_key(self, key: str) -> bool:
         """
         Deletes a readonly API key for a user
         Level 2 Auth required
@@ -340,94 +343,94 @@ class ClobClient:
             serialized_body=serialized,
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete(
+        return await delete(
             "{}{}".format(self.host, DELETE_READONLY_API_KEY),
             headers=headers,
             data=serialized,
         )
 
-    def validate_readonly_api_key(self, address: str, key: str) -> str:
+    async def validate_readonly_api_key(self, address: str, key: str) -> str:
         """
         Validates a readonly API key for a given address
         This is a public endpoint, no authentication required
         """
-        return get(
+        return await get(
             "{}{}?address={}&key={}".format(
                 self.host, VALIDATE_READONLY_API_KEY, address, key
             )
         )
 
-    def get_midpoint(self, token_id):
+    async def get_midpoint(self, token_id):
         """
         Get the mid market price for the given market
         """
-        return get("{}{}?token_id={}".format(self.host, MID_POINT, token_id))
+        return await get("{}{}?token_id={}".format(self.host, MID_POINT, token_id))
 
-    def get_midpoints(self, params: list[BookParams]):
+    async def get_midpoints(self, params: list[BookParams]):
         """
         Get the mid market prices for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return post("{}{}".format(self.host, MID_POINTS), data=body)
+        return await post("{}{}".format(self.host, MID_POINTS), data=body)
 
-    def get_price(self, token_id, side):
+    async def get_price(self, token_id, side):
         """
         Get the market price for the given market
         """
-        return get("{}{}?token_id={}&side={}".format(self.host, PRICE, token_id, side))
+        return await get("{}{}?token_id={}&side={}".format(self.host, PRICE, token_id, side))
 
-    def get_prices(self, params: list[BookParams]):
+    async def get_prices(self, params: list[BookParams]):
         """
         Get the market prices for a set
         """
         body = [{"token_id": param.token_id, "side": param.side} for param in params]
-        return post("{}{}".format(self.host, GET_PRICES), data=body)
+        return await post("{}{}".format(self.host, GET_PRICES), data=body)
 
-    def get_spread(self, token_id):
+    async def get_spread(self, token_id):
         """
         Get the spread for the given market
         """
-        return get("{}{}?token_id={}".format(self.host, GET_SPREAD, token_id))
+        return await get("{}{}?token_id={}".format(self.host, GET_SPREAD, token_id))
 
-    def get_spreads(self, params: list[BookParams]):
+    async def get_spreads(self, params: list[BookParams]):
         """
         Get the spreads for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return post("{}{}".format(self.host, GET_SPREADS), data=body)
+        return await post("{}{}".format(self.host, GET_SPREADS), data=body)
 
-    def get_tick_size(self, token_id: str) -> TickSize:
+    async def get_tick_size(self, token_id: str) -> TickSize:
         if token_id in self.__tick_sizes:
             return self.__tick_sizes[token_id]
 
-        result = get("{}{}?token_id={}".format(self.host, GET_TICK_SIZE, token_id))
+        result = await get("{}{}?token_id={}".format(self.host, GET_TICK_SIZE, token_id))
         self.__tick_sizes[token_id] = str(result["minimum_tick_size"])
 
         return self.__tick_sizes[token_id]
 
-    def get_neg_risk(self, token_id: str) -> bool:
+    async def get_neg_risk(self, token_id: str) -> bool:
         if token_id in self.__neg_risk:
             return self.__neg_risk[token_id]
 
-        result = get("{}{}?token_id={}".format(self.host, GET_NEG_RISK, token_id))
+        result = await get("{}{}?token_id={}".format(self.host, GET_NEG_RISK, token_id))
         self.__neg_risk[token_id] = result["neg_risk"]
 
         return result["neg_risk"]
 
-    def get_fee_rate_bps(self, token_id: str) -> int:
+async def get_fee_rate_bps(self, token_id: str) -> int:
         if token_id in self.__fee_rates:
             return self.__fee_rates[token_id]
 
-        result = get("{}{}?token_id={}".format(self.host, GET_FEE_RATE, token_id))
+        result = await get("{}{}?token_id={}".format(self.host, GET_FEE_RATE, token_id))
         fee_rate = result.get("base_fee") or 0
         self.__fee_rates[token_id] = fee_rate
 
         return fee_rate
 
-    def __resolve_tick_size(
+    async def __resolve_tick_size(
         self, token_id: str, tick_size: TickSize = None
     ) -> TickSize:
-        min_tick_size = self.get_tick_size(token_id)
+        min_tick_size = await self.get_tick_size(token_id)
         if tick_size is not None:
             if is_tick_size_smaller(tick_size, min_tick_size):
                 raise Exception(
@@ -440,8 +443,8 @@ class ClobClient:
             tick_size = min_tick_size
         return tick_size
 
-    def __resolve_fee_rate(self, token_id: str, user_fee_rate: int = None) -> int:
-        market_fee_rate_bps = self.get_fee_rate_bps(token_id)
+async def __resolve_fee_rate(self, token_id: str, user_fee_rate: int = None) -> int:
+        market_fee_rate_bps = await self.get_fee_rate_bps(token_id)
         # If both fee rate on the market and the user supplied fee rate are non-zero, validate that they match
         # else return the market fee rate
         if (
@@ -456,7 +459,7 @@ class ClobClient:
             )
         return market_fee_rate_bps
 
-    def create_order(
+    async def create_order(
         self, order_args: OrderArgs, options: Optional[PartialCreateOrderOptions] = None
     ):
         """
@@ -466,7 +469,7 @@ class ClobClient:
         self.assert_level_1_auth()
 
         # add resolve_order_options, or similar
-        tick_size = self.__resolve_tick_size(
+        tick_size = await self.__resolve_tick_size(
             order_args.token_id,
             options.tick_size if options else None,
         )
@@ -484,11 +487,11 @@ class ClobClient:
         neg_risk = (
             options.neg_risk
             if options and options.neg_risk
-            else self.get_neg_risk(order_args.token_id)
+            else await self.get_neg_risk(order_args.token_id)
         )
 
         # fee rate
-        fee_rate_bps = self.__resolve_fee_rate(
+        fee_rate_bps = await self.__resolve_fee_rate(
             order_args.token_id, order_args.fee_rate_bps
         )
         order_args.fee_rate_bps = fee_rate_bps
@@ -501,7 +504,7 @@ class ClobClient:
             ),
         )
 
-    def create_market_order(
+    async def create_market_order(
         self,
         order_args: MarketOrderArgs,
         options: Optional[PartialCreateOrderOptions] = None,
@@ -513,13 +516,13 @@ class ClobClient:
         self.assert_level_1_auth()
 
         # add resolve_order_options, or similar
-        tick_size = self.__resolve_tick_size(
+        tick_size = await self.__resolve_tick_size(
             order_args.token_id,
             options.tick_size if options else None,
         )
 
-        if order_args.price is None or order_args.price <= 0:
-            order_args.price = self.calculate_market_price(
+if order_args.price is None or order_args.price <= 0:
+            order_args.price = await self.calculate_market_price(
                 order_args.token_id,
                 order_args.side,
                 order_args.amount,
@@ -539,11 +542,11 @@ class ClobClient:
         neg_risk = (
             options.neg_risk
             if options and options.neg_risk
-            else self.get_neg_risk(order_args.token_id)
+            else await self.get_neg_risk(order_args.token_id)
         )
 
         # fee rate
-        fee_rate_bps = self.__resolve_fee_rate(
+        fee_rate_bps = await self.__resolve_fee_rate(
             order_args.token_id, order_args.fee_rate_bps
         )
         order_args.fee_rate_bps = fee_rate_bps
@@ -556,7 +559,7 @@ class ClobClient:
             ),
         )
 
-    def post_orders(self, args: list[PostOrdersArgs]):
+async def post_orders(self, args: list[PostOrdersArgs]):
         """
         Posts orders
         """
@@ -575,19 +578,19 @@ class ClobClient:
         if self.can_builder_auth():
             builder_headers = self._generate_builder_headers(request_args, headers)
             if builder_headers is not None:
-                return post(
+                return await post(
                     "{}{}".format(self.host, POST_ORDERS),
                     headers=builder_headers,
                     data=request_args.serialized_body,
                 )
         # send exact serialized bytes
-        return post(
+        return await post(
             "{}{}".format(self.host, POST_ORDERS),
             headers=headers,
             data=request_args.serialized_body,
         )
 
-    def post_order(self, order, orderType: OrderType = OrderType.GTC, post_only: bool = False):
+    async def post_order(self, order, orderType: OrderType = OrderType.GTC, post_only: bool = False):
         """
         Posts the order
         """
@@ -607,27 +610,27 @@ class ClobClient:
         if self.can_builder_auth():
             builder_headers = self._generate_builder_headers(request_args, headers)
             if builder_headers is not None:
-                return post(
+                return await post(
                     "{}{}".format(self.host, POST_ORDER),
                     headers=builder_headers,
                     data=request_args.serialized_body,
                 )
-        return post(
+        return await post(
             "{}{}".format(self.host, POST_ORDER),
             headers=headers,
             data=request_args.serialized_body,
         )
 
-    def create_and_post_order(
+    async def create_and_post_order(
         self, order_args: OrderArgs, options: PartialCreateOrderOptions = None
     ):
         """
         Utility function to create and publish an order
         """
-        ord = self.create_order(order_args, options)
-        return self.post_order(ord)
+        ord = await self.create_order(order_args, options)
+        return await self.post_order(ord)
 
-    def cancel(self, order_id):
+    async def cancel(self, order_id):
         """
         Cancels an order
         Level 2 Auth required
@@ -641,14 +644,14 @@ class ClobClient:
             body=body,
             serialized_body=json.dumps(body, separators=(",", ":"), ensure_ascii=False),
         )
-        headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete(
+headers = create_level_2_headers(self.signer, self.creds, request_args)
+        return await delete(
             "{}{}".format(self.host, CANCEL),
             headers=headers,
             data=request_args.serialized_body,
         )
 
-    def cancel_orders(self, order_ids):
+    async def cancel_orders(self, order_ids):
         """
         Cancels orders
         Level 2 Auth required
@@ -662,12 +665,12 @@ class ClobClient:
             body=body,
             serialized_body=serialized,
         )
-        headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete(
+headers = create_level_2_headers(self.signer, self.creds, request_args)
+        return await delete(
             "{}{}".format(self.host, CANCEL_ORDERS), headers=headers, data=serialized
         )
 
-    def cancel_all(self):
+    async def cancel_all(self):
         """
         Cancels all available orders for the user
         Level 2 Auth required
@@ -675,9 +678,9 @@ class ClobClient:
         self.assert_level_2_auth()
         request_args = RequestArgs(method="DELETE", request_path=CANCEL_ALL)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete("{}{}".format(self.host, CANCEL_ALL), headers=headers)
+        return await delete("{}{}".format(self.host, CANCEL_ALL), headers=headers)
 
-    def post_heartbeat(self, heartbeat_id: Optional[str]):
+    async def post_heartbeat(self, heartbeat_id: Optional[str]):
         """
         Sends a heartbeat to the server, if heartbeats are started and one isn't sent within 10s, all orders will be cancelled
         Requires Level 2 authentication
@@ -687,13 +690,13 @@ class ClobClient:
         serialized = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
         request_args = RequestArgs(method="POST", request_path=POST_HEARTBEAT, body=body, serialized_body=serialized)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return post(
+        return await post(
             "{}{}".format(self.host, POST_HEARTBEAT),
             headers=headers,
             data=serialized
         )
 
-    def cancel_market_orders(self, market: str = "", asset_id: str = ""):
+    async def cancel_market_orders(self, market: str = "", asset_id: str = ""):
         """
         Cancels orders
         Level 2 Auth required
@@ -708,13 +711,13 @@ class ClobClient:
             serialized_body=serialized,
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return delete(
+        return await delete(
             "{}{}".format(self.host, CANCEL_MARKET_ORDERS),
             headers=headers,
             data=serialized,
         )
 
-    def get_orders(self, params: OpenOrderParams = None, next_cursor="MA=="):
+    async def get_orders(self, params: OpenOrderParams = None, next_cursor="MA=="):
         """
         Gets orders for the API key
         Requires Level 2 authentication
@@ -729,25 +732,25 @@ class ClobClient:
             url = add_query_open_orders_params(
                 "{}{}".format(self.host, ORDERS), params, next_cursor
             )
-            response = get(url, headers=headers)
+            response = await get(url, headers=headers)
             next_cursor = response["next_cursor"]
             results += response["data"]
 
         return results
 
-    def get_order_book(self, token_id) -> OrderBookSummary:
+    async def get_order_book(self, token_id) -> OrderBookSummary:
         """
         Fetches the orderbook for the token_id
         """
-        raw_obs = get("{}{}?token_id={}".format(self.host, GET_ORDER_BOOK, token_id))
+        raw_obs = await get("{}{}?token_id={}".format(self.host, GET_ORDER_BOOK, token_id))
         return parse_raw_orderbook_summary(raw_obs)
 
-    def get_order_books(self, params: list[BookParams]) -> list[OrderBookSummary]:
+    async def get_order_books(self, params: list[BookParams]) -> list[OrderBookSummary]:
         """
         Fetches the orderbook for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        raw_obs = post("{}{}".format(self.host, GET_ORDER_BOOKS), data=body)
+        raw_obs = await post("{}{}".format(self.host, GET_ORDER_BOOKS), data=body)
         return [parse_raw_orderbook_summary(r) for r in raw_obs]
 
     def get_order_book_hash(self, orderbook: OrderBookSummary) -> str:
@@ -756,7 +759,7 @@ class ClobClient:
         """
         return generate_orderbook_summary_hash(orderbook)
 
-    def get_order(self, order_id):
+    async def get_order(self, order_id):
         """
         Fetches the order corresponding to the order_id
         Requires Level 2 authentication
@@ -765,9 +768,9 @@ class ClobClient:
         endpoint = "{}{}".format(GET_ORDER, order_id)
         request_args = RequestArgs(method="GET", request_path=endpoint)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return get("{}{}".format(self.host, endpoint), headers=headers)
+        return await get("{}{}".format(self.host, endpoint), headers=headers)
 
-    def get_trades(self, params: TradeParams = None, next_cursor="MA=="):
+    async def get_trades(self, params: TradeParams = None, next_cursor="MA=="):
         """
         Fetches the trade history for a user
         Requires Level 2 authentication
@@ -782,24 +785,24 @@ class ClobClient:
             url = add_query_trade_params(
                 "{}{}".format(self.host, TRADES), params, next_cursor
             )
-            response = get(url, headers=headers)
+            response = await get(url, headers=headers)
             next_cursor = response["next_cursor"]
             results += response["data"]
 
         return results
 
-    def get_last_trade_price(self, token_id):
+    async def get_last_trade_price(self, token_id):
         """
         Fetches the last trade price token_id
         """
-        return get("{}{}?token_id={}".format(self.host, GET_LAST_TRADE_PRICE, token_id))
+        return await get("{}{}?token_id={}".format(self.host, GET_LAST_TRADE_PRICE, token_id))
 
-    def get_last_trades_prices(self, params: list[BookParams]):
+    async def get_last_trades_prices(self, params: list[BookParams]):
         """
         Fetches the last trades prices for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return post("{}{}".format(self.host, GET_LAST_TRADES_PRICES), data=body)
+        return await post("{}{}".format(self.host, GET_LAST_TRADES_PRICES), data=body)
 
     def assert_level_1_auth(self):
         """
@@ -832,7 +835,7 @@ class ClobClient:
             return L1
         return L0
 
-    def _generate_builder_headers(self, request_args: RequestArgs, headers: dict):
+def _generate_builder_headers(self, request_args: RequestArgs, headers: dict):
         """
         Generates builder headers and attaches them to the L2 Header
         """
@@ -864,7 +867,7 @@ class ClobClient:
             return headers.to_dict()
         return None
 
-    def get_notifications(self):
+    async def get_notifications(self):
         """
         Fetches the notifications for a user
         Requires Level 2 authentication
@@ -875,9 +878,9 @@ class ClobClient:
         url = "{}{}?signature_type={}".format(
             self.host, GET_NOTIFICATIONS, self.builder.sig_type
         )
-        return get(url, headers=headers)
+        return await get(url, headers=headers)
 
-    def drop_notifications(self, params: DropNotificationParams = None):
+    async def drop_notifications(self, params: DropNotificationParams = None):
         """
         Drops the notifications for a user
         Requires Level 2 authentication
@@ -888,9 +891,9 @@ class ClobClient:
         url = drop_notifications_query_params(
             "{}{}".format(self.host, DROP_NOTIFICATIONS), params
         )
-        return delete(url, headers=headers)
+        return await delete(url, headers=headers)
 
-    def get_balance_allowance(self, params: BalanceAllowanceParams = None):
+    async def get_balance_allowance(self, params: BalanceAllowanceParams = None):
         """
         Fetches the balance & allowance for a user
         Requires Level 2 authentication
@@ -903,9 +906,9 @@ class ClobClient:
         url = add_balance_allowance_params_to_url(
             "{}{}".format(self.host, GET_BALANCE_ALLOWANCE), params
         )
-        return get(url, headers=headers)
+        return await get(url, headers=headers)
 
-    def update_balance_allowance(self, params: BalanceAllowanceParams = None):
+    async def update_balance_allowance(self, params: BalanceAllowanceParams = None):
         """
         Updates the balance & allowance for a user
         Requires Level 2 authentication
@@ -918,9 +921,9 @@ class ClobClient:
         url = add_balance_allowance_params_to_url(
             "{}{}".format(self.host, UPDATE_BALANCE_ALLOWANCE), params
         )
-        return get(url, headers=headers)
+        return await get(url, headers=headers)
 
-    def is_order_scoring(self, params: OrderScoringParams):
+    async def is_order_scoring(self, params: OrderScoringParams):
         """
         Check if the order is currently scoring
         Requires Level 2 authentication
@@ -931,9 +934,9 @@ class ClobClient:
         url = add_order_scoring_params_to_url(
             "{}{}".format(self.host, IS_ORDER_SCORING), params
         )
-        return get(url, headers=headers)
+        return await get(url, headers=headers)
 
-    def are_orders_scoring(self, params: OrdersScoringParams):
+    async def are_orders_scoring(self, params: OrdersScoringParams):
         """
         Check if the orders are currently scoring
         Requires Level 2 authentication
@@ -947,58 +950,58 @@ class ClobClient:
             body=body,
             serialized_body=serialized,
         )
-        headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return post(
+headers = create_level_2_headers(self.signer, self.creds, request_args)
+        return await post(
             "{}{}".format(self.host, ARE_ORDERS_SCORING),
             headers=headers,
             data=serialized,
         )
 
-    def get_sampling_markets(self, next_cursor="MA=="):
+    async def get_sampling_markets(self, next_cursor="MA=="):
         """
         Get the current sampling markets
         """
-        return get(
+        return await get(
             "{}{}?next_cursor={}".format(self.host, GET_SAMPLING_MARKETS, next_cursor)
         )
 
-    def get_sampling_simplified_markets(self, next_cursor="MA=="):
+    async def get_sampling_simplified_markets(self, next_cursor="MA=="):
         """
         Get the current sampling simplified markets
         """
-        return get(
+        return await get(
             "{}{}?next_cursor={}".format(
                 self.host, GET_SAMPLING_SIMPLIFIED_MARKETS, next_cursor
             )
         )
 
-    def get_markets(self, next_cursor="MA=="):
+    async def get_markets(self, next_cursor="MA=="):
         """
         Get the current markets
         """
-        return get("{}{}?next_cursor={}".format(self.host, GET_MARKETS, next_cursor))
+        return await get("{}{}?next_cursor={}".format(self.host, GET_MARKETS, next_cursor))
 
-    def get_simplified_markets(self, next_cursor="MA=="):
+    async def get_simplified_markets(self, next_cursor="MA=="):
         """
         Get the current simplified markets
         """
-        return get(
+        return await get(
             "{}{}?next_cursor={}".format(self.host, GET_SIMPLIFIED_MARKETS, next_cursor)
         )
 
-    def get_market(self, condition_id):
+    async def get_market(self, condition_id):
         """
         Get a market by condition_id
         """
-        return get("{}{}{}".format(self.host, GET_MARKET, condition_id))
+        return await get("{}{}{}".format(self.host, GET_MARKET, condition_id))
 
-    def get_market_trades_events(self, condition_id):
+    async def get_market_trades_events(self, condition_id):
         """
         Get the market's trades events by condition id
         """
-        return get("{}{}{}".format(self.host, GET_MARKET_TRADES_EVENTS, condition_id))
+        return await get("{}{}{}".format(self.host, GET_MARKET_TRADES_EVENTS, condition_id))
 
-    def get_builder_trades(self, params: TradeParams = None, next_cursor="MA=="):
+async def get_builder_trades(self, params: TradeParams = None, next_cursor="MA=="):
         """
         Get trades originated by the builder
         """
@@ -1015,19 +1018,19 @@ class ClobClient:
             url = add_query_trade_params(
                 "{}{}".format(self.host, GET_BUILDER_TRADES), params, next_cursor
             )
-            response = get(url, headers=headers)
+            response = await get(url, headers=headers)
             next_cursor = response["next_cursor"]
             results += response["data"]
 
         return results
 
-    def calculate_market_price(
+    async def calculate_market_price(
         self, token_id: str, side: str, amount: float, order_type: OrderType
     ) -> float:
         """
         Calculates the matching price considering an amount and the current orderbook
         """
-        book = self.get_order_book(token_id)
+        book = await self.get_order_book(token_id)
         if book is None:
             raise Exception("no orderbook")
         if side == "BUY":
@@ -1043,15 +1046,15 @@ return self.builder.calculate_sell_market_price(
                 book.bids, amount, order_type
             )
 
-    def get_price_history_with_interval(self, token_id: str, interval: str, fidelity: str):
+    async def get_price_history_with_interval(self, token_id: str, interval: str, fidelity: str):
         """
         Get the price history for a given token_id with interval.
         startTs/endTs are mutually exclusive to interval.
         """
-        return get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
+return await get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
 
-    def get_price_history_with_timestamps(self, token_id: str, startTs: int, endTs: int, fidelity: str):
+    async def get_price_history_with_timestamps(self, token_id: str, startTs: int, endTs: int, fidelity: str):
         """
         Get the price history for a given token_id with timestamps
         """
-        return get("{}{}?market={}&startTs={}&endTs={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, startTs, endTs, fidelity))
+        return await get("{}{}?market={}&startTs={}&endTs={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, startTs, endTs, fidelity))

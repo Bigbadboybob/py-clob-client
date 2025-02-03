@@ -34,19 +34,22 @@ def overloadHeaders(method: str, headers: dict) -> dict:
     return headers
 
 
-def request(endpoint: str, method: str, headers=None, data=None):
+client = httpx.AsyncClient()
+
+
+async def request(endpoint: str, method: str, headers=None, data=None):
     try:
         headers = overloadHeaders(method, headers)
         if isinstance(data, str):
             # Pre-serialized body: send exact bytes
-            resp = _http_client.request(
+            resp = await client.request(
                 method=method,
                 url=endpoint,
                 headers=headers,
                 content=data.encode("utf-8"),
             )
         else:
-            resp = _http_client.request(
+            resp = await client.request(
                 method=method,
                 url=endpoint,
                 headers=headers,
@@ -65,16 +68,16 @@ def request(endpoint: str, method: str, headers=None, data=None):
         raise PolyApiException(error_msg="Request exception!")
 
 
-def post(endpoint, headers=None, data=None):
-    return request(endpoint, POST, headers, data)
+async def post(endpoint, headers=None, data=None):
+    return await request(endpoint, POST, headers, data)
 
 
-def get(endpoint, headers=None, data=None):
-    return request(endpoint, GET, headers, data)
+async def get(endpoint, headers=None, data=None):
+    return await request(endpoint, GET, headers, data)
 
 
-def delete(endpoint, headers=None, data=None):
-    return request(endpoint, DELETE, headers, data)
+async def delete(endpoint, headers=None, data=None):
+    return await request(endpoint, DELETE, headers, data)
 
 
 def put(endpoint, headers=None, data=None):
