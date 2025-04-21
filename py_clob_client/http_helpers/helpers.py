@@ -34,50 +34,64 @@ def overloadHeaders(method: str, headers: dict) -> dict:
     return headers
 
 
-client = httpx.AsyncClient()
+class ClientHelper:
+    """
+    Helper class to manage the HTTP client and request methods.
+    """
+    def __init__(self, client: httpx.AsyncClient):
+        self.client = client
 
-
-async def request(endpoint: str, method: str, headers=None, data=None):
-    try:
-        headers = overloadHeaders(method, headers)
-        if isinstance(data, str):
-            # Pre-serialized body: send exact bytes
-            resp = await client.request(
-                method=method,
-                url=endpoint,
-                headers=headers,
-                content=data.encode("utf-8"),
-            )
-        else:
-            resp = await client.request(
-                method=method,
-                url=endpoint,
-                headers=headers,
-                json=data,
-            )
-
-        if resp.status_code != 200:
-            raise PolyApiException(resp)
-
+    async def request(self, endpoint: str, method: str, headers=None, data=None):
         try:
-            return resp.json()
-        except ValueError:
-            return resp.text
+            headers = overloadHeaders(method, headers)
+            if isinstance(data, str):
+                # Pre-serialized body: send exact bytes
+                resp = await self.client.request(
+                    method=method,
+                    url=endpoint,
+                    headers=headers,
+                    content=data.encode("utf-8"),
+                )
+            else:
+                resp = await self.client.request(
+                    method=method,
+                    url=endpoint,
+                    headers=headers,
+                    json=data,
+                )
 
-    except httpx.RequestError:
-        raise PolyApiException(error_msg="Request exception!")
+            if resp.status_code != 200:
+                raise PolyApiException(resp)
+
+            # Check content type header to see if it's JSON
+            content_type = resp.headers.get("content-type", "")
+
+            # If empty response or explicitly not JSON, return appropriate value
+            if not resp.content or len(resp.content.strip()) == 0:
+                return {}
+            elif "application/json" in content_type:
+                return resp.json()
+            else:
+                return resp.text
+
+        except httpx.RequestError as e:
+            error_msg = f"Request error: {str(e)}"
+            raise PolyApiException(error_msg=error_msg) from e
+
+    async def post(self, endpoint, headers=None, data=None):
+        return await self.request(endpoint, POST, headers, data)
+
+    async def get(self, endpoint, headers=None, data=None):
+        return await self.request(endpoint, GET, headers, data)
+
+    async def delete(self, endpoint, headers=None, data=None):
+        return await self.request(endpoint, DELETE, headers, data)
 
 
-async def post(endpoint, headers=None, data=None):
-    return await request(endpoint, POST, headers, data)
-
-
-async def get(endpoint, headers=None, data=None):
-    return await request(endpoint, GET, headers, data)
-
-
-async def delete(endpoint, headers=None, data=None):
-    return await request(endpoint, DELETE, headers, data)
+client_helper = ClientHelper(httpx.AsyncClient())
+get = client_helper.get
+post = client_helper.post
+delete = client_helper.delete
 
 
 def put(endpoint, headers=None, data=None):

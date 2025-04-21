@@ -4,6 +4,7 @@ from typing import Optional
 import json
 import asyncio
 import websockets
+import httpx
 
 from py_builder_signing_sdk.config import BuilderConfig
 
@@ -92,6 +93,7 @@ from .http_helpers.helpers import (
     delete,
     get,
     post,
+    ClientHelper,
     drop_notifications_query_params,
     add_balance_allowance_params_to_url,
     add_order_scoring_params_to_url,
@@ -125,7 +127,8 @@ class ClobClient:
         creds: ApiCreds = None,
         signature_type: int = None,
         funder: str = None,
-        builder_config: BuilderConfig = None,
+builder_config: BuilderConfig = None,
+        order_proxy: str = None,
     ):
         """
         Initializes the clob client
@@ -161,6 +164,12 @@ class ClobClient:
 
         # RFQ client
         self.rfq = RfqClient(self)
+
+        # use proxy to post orders if provided, otherwise use default post function
+        self.order_post = post
+        if order_proxy is not None:
+            self.proxy_client = ClientHelper(httpx.AsyncClient(proxy=order_proxy))
+            self.order_post = self.proxy_client.post
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -615,7 +624,7 @@ async def post_orders(self, args: list[PostOrdersArgs]):
                     headers=builder_headers,
                     data=request_args.serialized_body,
                 )
-        return await post(
+return await post(
             "{}{}".format(self.host, POST_ORDER),
             headers=headers,
             data=request_args.serialized_body,
