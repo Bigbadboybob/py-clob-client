@@ -1,5 +1,6 @@
 import httpx
 import asyncio
+import traceback
 
 from py_clob_client.clob_types import (
     DropNotificationParams,
@@ -61,7 +62,8 @@ class ClientHelper:
                 return resp.text
 
         except httpx.RequestError as e:
-            error_msg = f"Request error: {str(e)}"
+            traceback.print_exc()
+            error_msg = f"Request error: {repr(e)}"
             raise PolyApiException(error_msg=error_msg) from e
 
     async def post(self, endpoint, headers=None, data=None):
