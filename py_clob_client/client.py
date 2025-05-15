@@ -73,10 +73,9 @@ from .exceptions import PolyException
 from .http_helpers.helpers import (
     add_query_trade_params,
     add_query_open_orders_params,
-    delete,
-    get,
-    post,
     ClientHelper,
+    get_client,
+    set_client,
     drop_notifications_query_params,
     add_balance_allowance_params_to_url,
     add_order_scoring_params_to_url,
@@ -101,7 +100,7 @@ class ClobClient:
         creds: ApiCreds = None,
         signature_type: int = None,
         funder: str = None,
-        order_proxy: str = None,
+        httpx_client: httpx.AsyncClient = None,
     ):
         """
         Initializes the clob client
@@ -131,11 +130,12 @@ class ClobClient:
         self.__neg_risk = {}
 
         # use proxy to post orders if provided, otherwise use default post function
-        self.order_post = post
-        if order_proxy is not None:
+        if httpx_client is not None:
             # timeouts = httpx.Timeout(connect=10.0, read=20.0, write=20.0, pool=None)
-            self.proxy_client = ClientHelper(httpx.AsyncClient(proxy=order_proxy))
-            self.order_post = self.proxy_client.post
+            self.client = ClientHelper(httpx_client)
+            set_client(self.client)
+        else:
+            self.client = get_client()
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -174,14 +174,14 @@ class ClobClient:
         Health check: Confirms that the server is up
         Does not need authentication
         """
-        return await get("{}/".format(self.host))
+        return await self.client.get("{}/".format(self.host))
 
     async def get_server_time(self):
         """
         Returns the current timestamp on the server
         Does not need authentication
         """
-        return await get("{}{}".format(self.host, TIME))
+        return await self.client.get("{}{}".format(self.host, TIME))
 
     async def create_api_key(self, nonce: int = None) -> ApiCreds:
         """
@@ -192,7 +192,7 @@ class ClobClient:
         endpoint = "{}{}".format(self.host, CREATE_API_KEY)
         headers = create_level_1_headers(self.signer, nonce)
 
-        creds_raw = await post(endpoint, headers=headers)
+        creds_raw = await self.client.post(endpoint, headers=headers)
         try:
             creds = ApiCreds(
                 api_key=creds_raw["apiKey"],
@@ -213,7 +213,7 @@ class ClobClient:
         endpoint = "{}{}".format(self.host, DERIVE_API_KEY)
         headers = create_level_1_headers(self.signer, nonce)
 
-        creds_raw = await get(endpoint, headers=headers)
+        creds_raw = await self.client.get(endpoint, headers=headers)
         try:
             creds = ApiCreds(
                 api_key=creds_raw["apiKey"],
@@ -250,7 +250,7 @@ class ClobClient:
 
         request_args = RequestArgs(method="GET", request_path=GET_API_KEYS)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await get("{}{}".format(self.host, GET_API_KEYS), headers=headers)
+        return await self.client.get("{}{}".format(self.host, GET_API_KEYS), headers=headers)
 
     async def get_closed_only_mode(self):
         """
@@ -261,7 +261,7 @@ class ClobClient:
 
         request_args = RequestArgs(method="GET", request_path=CLOSED_ONLY)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await get("{}{}".format(self.host, CLOSED_ONLY), headers=headers)
+        return await self.client.get("{}{}".format(self.host, CLOSED_ONLY), headers=headers)
 
     async def delete_api_key(self):
         """
@@ -272,52 +272,52 @@ class ClobClient:
 
         request_args = RequestArgs(method="DELETE", request_path=DELETE_API_KEY)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await delete("{}{}".format(self.host, DELETE_API_KEY), headers=headers)
+        return await self.client.delete("{}{}".format(self.host, DELETE_API_KEY), headers=headers)
 
     async def get_midpoint(self, token_id):
         """
         Get the mid market price for the given market
         """
-        return await get("{}{}?token_id={}".format(self.host, MID_POINT, token_id))
+        return await self.client.get("{}{}?token_id={}".format(self.host, MID_POINT, token_id))
 
     async def get_midpoints(self, params: list[BookParams]):
         """
         Get the mid market prices for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return await post("{}{}".format(self.host, MID_POINTS), data=body)
+        return await self.client.post("{}{}".format(self.host, MID_POINTS), data=body)
 
     async def get_price(self, token_id, side):
         """
         Get the market price for the given market
         """
-        return await get("{}{}?token_id={}&side={}".format(self.host, PRICE, token_id, side))
+        return await self.client.get("{}{}?token_id={}&side={}".format(self.host, PRICE, token_id, side))
 
     async def get_prices(self, params: list[BookParams]):
         """
         Get the market prices for a set
         """
         body = [{"token_id": param.token_id, "side": param.side} for param in params]
-        return await post("{}{}".format(self.host, GET_PRICES), data=body)
+        return await self.client.post("{}{}".format(self.host, GET_PRICES), data=body)
 
     async def get_spread(self, token_id):
         """
         Get the spread for the given market
         """
-        return await get("{}{}?token_id={}".format(self.host, GET_SPREAD, token_id))
+        return await self.client.get("{}{}?token_id={}".format(self.host, GET_SPREAD, token_id))
 
     async def get_spreads(self, params: list[BookParams]):
         """
         Get the spreads for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return await post("{}{}".format(self.host, GET_SPREADS), data=body)
+        return await self.client.post("{}{}".format(self.host, GET_SPREADS), data=body)
 
     async def get_tick_size(self, token_id: str) -> TickSize:
         if token_id in self.__tick_sizes:
             return self.__tick_sizes[token_id]
 
-        result = await get("{}{}?token_id={}".format(self.host, GET_TICK_SIZE, token_id))
+        result = await self.client.get("{}{}?token_id={}".format(self.host, GET_TICK_SIZE, token_id))
         self.__tick_sizes[token_id] = str(result["minimum_tick_size"])
 
         return self.__tick_sizes[token_id]
@@ -326,7 +326,7 @@ class ClobClient:
         if token_id in self.__neg_risk:
             return self.__neg_risk[token_id]
 
-        result = await get("{}{}?token_id={}".format(self.host, GET_NEG_RISK, token_id))
+        result = await self.client.get("{}{}?token_id={}".format(self.host, GET_NEG_RISK, token_id))
         self.__neg_risk[token_id] = result["neg_risk"]
 
         return result["neg_risk"]
@@ -443,7 +443,7 @@ class ClobClient:
             self.creds,
             RequestArgs(method="POST", request_path=POST_ORDER, body=body),
         )
-        return await self.order_post("{}{}".format(self.host, POST_ORDER), headers=headers, data=body)
+        return await self.client.post("{}{}".format(self.host, POST_ORDER), headers=headers, data=body)
 
     async def create_and_post_order(
         self, order_args: OrderArgs, options: PartialCreateOrderOptions = None
@@ -464,7 +464,7 @@ class ClobClient:
 
         request_args = RequestArgs(method="DELETE", request_path=CANCEL, body=body)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await delete("{}{}".format(self.host, CANCEL), headers=headers, data=body)
+        return await self.client.delete("{}{}".format(self.host, CANCEL), headers=headers, data=body)
 
     async def cancel_orders(self, order_ids):
         """
@@ -478,7 +478,7 @@ class ClobClient:
             method="DELETE", request_path=CANCEL_ORDERS, body=body
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await delete(
+        return await self.client.delete(
             "{}{}".format(self.host, CANCEL_ORDERS), headers=headers, data=body
         )
 
@@ -490,7 +490,7 @@ class ClobClient:
         self.assert_level_2_auth()
         request_args = RequestArgs(method="DELETE", request_path=CANCEL_ALL)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await delete("{}{}".format(self.host, CANCEL_ALL), headers=headers)
+        return await self.client.delete("{}{}".format(self.host, CANCEL_ALL), headers=headers)
 
     async def cancel_market_orders(self, market: str = "", asset_id: str = ""):
         """
@@ -504,7 +504,7 @@ class ClobClient:
             method="DELETE", request_path=CANCEL_MARKET_ORDERS, body=body
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await delete(
+        return await self.client.delete(
             "{}{}".format(self.host, CANCEL_MARKET_ORDERS), headers=headers, data=body
         )
 
@@ -523,7 +523,7 @@ class ClobClient:
             url = add_query_open_orders_params(
                 "{}{}".format(self.host, ORDERS), params, next_cursor
             )
-            response = await get(url, headers=headers)
+            response = await self.client.get(url, headers=headers)
             next_cursor = response["next_cursor"]
             results += response["data"]
 
@@ -533,7 +533,7 @@ class ClobClient:
         """
         Fetches the orderbook for the token_id
         """
-        raw_obs = await get("{}{}?token_id={}".format(self.host, GET_ORDER_BOOK, token_id))
+        raw_obs = await self.client.get("{}{}?token_id={}".format(self.host, GET_ORDER_BOOK, token_id))
         return parse_raw_orderbook_summary(raw_obs)
 
     async def get_order_books(self, params: list[BookParams]) -> list[OrderBookSummary]:
@@ -541,7 +541,7 @@ class ClobClient:
         Fetches the orderbook for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        raw_obs = await post("{}{}".format(self.host, GET_ORDER_BOOKS), data=body)
+        raw_obs = await self.client.post("{}{}".format(self.host, GET_ORDER_BOOKS), data=body)
         return [parse_raw_orderbook_summary(r) for r in raw_obs]
 
     def get_order_book_hash(self, orderbook: OrderBookSummary) -> str:
@@ -559,7 +559,7 @@ class ClobClient:
         endpoint = "{}{}".format(GET_ORDER, order_id)
         request_args = RequestArgs(method="GET", request_path=endpoint)
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await get("{}{}".format(self.host, endpoint), headers=headers)
+        return await self.client.get("{}{}".format(self.host, endpoint), headers=headers)
 
     async def get_trades(self, params: TradeParams = None, next_cursor="MA=="):
         """
@@ -576,7 +576,7 @@ class ClobClient:
             url = add_query_trade_params(
                 "{}{}".format(self.host, TRADES), params, next_cursor
             )
-            response = await get(url, headers=headers)
+            response = await self.client.get(url, headers=headers)
             next_cursor = response["next_cursor"]
             results += response["data"]
 
@@ -586,14 +586,14 @@ class ClobClient:
         """
         Fetches the last trade price token_id
         """
-        return await get("{}{}?token_id={}".format(self.host, GET_LAST_TRADE_PRICE, token_id))
+        return await self.client.get("{}{}?token_id={}".format(self.host, GET_LAST_TRADE_PRICE, token_id))
 
     async def get_last_trades_prices(self, params: list[BookParams]):
         """
         Fetches the last trades prices for a set of token ids
         """
         body = [{"token_id": param.token_id} for param in params]
-        return await post("{}{}".format(self.host, GET_LAST_TRADES_PRICES), data=body)
+        return await self.client.post("{}{}".format(self.host, GET_LAST_TRADES_PRICES), data=body)
 
     def assert_level_1_auth(self):
         """
@@ -627,7 +627,7 @@ class ClobClient:
         url = "{}{}?signature_type={}".format(
             self.host, GET_NOTIFICATIONS, self.builder.sig_type
         )
-        return await get(url, headers=headers)
+        return await self.client.get(url, headers=headers)
 
     async def drop_notifications(self, params: DropNotificationParams = None):
         """
@@ -640,7 +640,7 @@ class ClobClient:
         url = drop_notifications_query_params(
             "{}{}".format(self.host, DROP_NOTIFICATIONS), params
         )
-        return await delete(url, headers=headers)
+        return await self.client.delete(url, headers=headers)
 
     async def get_balance_allowance(self, params: BalanceAllowanceParams = None):
         """
@@ -655,7 +655,7 @@ class ClobClient:
         url = add_balance_allowance_params_to_url(
             "{}{}".format(self.host, GET_BALANCE_ALLOWANCE), params
         )
-        return await get(url, headers=headers)
+        return await self.client.get(url, headers=headers)
 
     async def update_balance_allowance(self, params: BalanceAllowanceParams = None):
         """
@@ -670,7 +670,7 @@ class ClobClient:
         url = add_balance_allowance_params_to_url(
             "{}{}".format(self.host, UPDATE_BALANCE_ALLOWANCE), params
         )
-        return await get(url, headers=headers)
+        return await self.client.get(url, headers=headers)
 
     async def is_order_scoring(self, params: OrderScoringParams):
         """
@@ -683,7 +683,7 @@ class ClobClient:
         url = add_order_scoring_params_to_url(
             "{}{}".format(self.host, IS_ORDER_SCORING), params
         )
-        return await get(url, headers=headers)
+        return await self.client.get(url, headers=headers)
 
     async def are_orders_scoring(self, params: OrdersScoringParams):
         """
@@ -696,7 +696,7 @@ class ClobClient:
             method="POST", request_path=ARE_ORDERS_SCORING, body=body
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-        return await post(
+        return await self.client.post(
             "{}{}".format(self.host, ARE_ORDERS_SCORING), headers=headers, data=body
         )
 
@@ -704,7 +704,7 @@ class ClobClient:
         """
         Get the current sampling markets
         """
-        return await get(
+        return await self.client.get(
             "{}{}?next_cursor={}".format(self.host, GET_SAMPLING_MARKETS, next_cursor)
         )
 
@@ -712,7 +712,7 @@ class ClobClient:
         """
         Get the current sampling simplified markets
         """
-        return await get(
+        return await self.client.get(
             "{}{}?next_cursor={}".format(
                 self.host, GET_SAMPLING_SIMPLIFIED_MARKETS, next_cursor
             )
@@ -722,13 +722,13 @@ class ClobClient:
         """
         Get the current markets
         """
-        return await get("{}{}?next_cursor={}".format(self.host, GET_MARKETS, next_cursor))
+        return await self.client.get("{}{}?next_cursor={}".format(self.host, GET_MARKETS, next_cursor))
 
     async def get_simplified_markets(self, next_cursor="MA=="):
         """
         Get the current simplified markets
         """
-        return await get(
+        return await self.client.get(
             "{}{}?next_cursor={}".format(self.host, GET_SIMPLIFIED_MARKETS, next_cursor)
         )
 
@@ -736,13 +736,13 @@ class ClobClient:
         """
         Get a market by condition_id
         """
-        return await get("{}{}{}".format(self.host, GET_MARKET, condition_id))
+        return await self.client.get("{}{}{}".format(self.host, GET_MARKET, condition_id))
 
     async def get_market_trades_events(self, condition_id):
         """
         Get the market's trades events by condition id
         """
-        return await get("{}{}{}".format(self.host, GET_MARKET_TRADES_EVENTS, condition_id))
+        return await self.client.get("{}{}{}".format(self.host, GET_MARKET_TRADES_EVENTS, condition_id))
 
     async def calculate_market_price(self, token_id: str, side: str, amount: float) -> float:
         """
@@ -765,10 +765,10 @@ class ClobClient:
         Get the price history for a given token_id with interval.
         startTs/endTs are mutually exclusive to interval.
         """
-        return await get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
+        return await self.client.get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
 
     async def get_price_history_with_timestamps(self, token_id: str, startTs: int, endTs: int, fidelity: str):
         """
         Get the price history for a given token_id with timestamps
         """
-        return await get("{}{}?market={}&startTs={}&endTs={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, startTs, endTs, fidelity))
+        return await self.client.get("{}{}?market={}&startTs={}&endTs={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, startTs, endTs, fidelity))
