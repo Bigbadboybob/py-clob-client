@@ -90,10 +90,16 @@ class ClientHelper:
         return await self.request(endpoint, DELETE, headers, data)
 
 
-client_helper = ClientHelper(httpx.AsyncClient())
-get = client_helper.get
-post = client_helper.post
-delete = client_helper.delete
+_client_helper = None
+def get_client() -> ClientHelper:
+    global _client_helper
+    if _client_helper is None:
+        _client_helper = ClientHelper(httpx.AsyncClient())
+    return _client_helper
+
+def set_client(client_helper: ClientHelper) -> None:
+    global _client_helper
+    _client_helper =  client_helper
 
 
 def put(endpoint, headers=None, data=None):
