@@ -63,7 +63,7 @@ class ClientHelper:
 
         except httpx.RequestError as e:
             traceback.print_exc()
-            error_msg = f"Request error: {repr(e)}"
+            error_msg=f"{e.__class__.__name__}: {repr(e)}"
             raise PolyApiException(error_msg=error_msg) from e
 
     async def post(self, endpoint, headers=None, data=None):

@@ -133,6 +133,7 @@ class ClobClient:
         # use proxy to post orders if provided, otherwise use default post function
         self.order_post = post
         if order_proxy is not None:
+            # timeouts = httpx.Timeout(connect=10.0, read=20.0, write=20.0, pool=None)
             self.proxy_client = ClientHelper(httpx.AsyncClient(proxy=order_proxy))
             self.order_post = self.proxy_client.post
 
