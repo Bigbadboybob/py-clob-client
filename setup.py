@@ -21,6 +21,9 @@ setuptools.setup(
         "py-order-utils>=0.3.2",
         "python-dotenv",
         "requests",
+        "decimal",
+        "websockets",
+        "httpx",
     ],
     project_urls={
         "Bug Tracker": "https://github.com/Polymarket/py-clob-client/issues",

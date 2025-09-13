@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+import pytest
 from py_clob_client.clob_types import (
     OrderArgs,
     MarketOrderArgs,
@@ -130,6 +131,7 @@ class TestOrderBuilder(TestCase):
         builder = OrderBuilder(signer)
         self.assertEqual(builder.calculate_sell_market_price(positions, 300), 0.3)
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_buy_0_1(self):
         builder = OrderBuilder(signer)
 
@@ -152,6 +154,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_buy_0_01(self):
         builder = OrderBuilder(signer)
 
@@ -174,6 +177,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_buy_0_001(self):
         builder = OrderBuilder(signer)
 
@@ -196,6 +200,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_buy_0_0001(self):
         builder = OrderBuilder(signer)
 
@@ -218,6 +223,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_sell_0_1(self):
         builder = OrderBuilder(signer)
 
@@ -240,6 +246,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_sell_0_01(self):
         builder = OrderBuilder(signer)
 
@@ -262,6 +269,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_sell_0_001(self):
         builder = OrderBuilder(signer)
 
@@ -284,6 +292,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_market_order_amounts_sell_0_0001(self):
         builder = OrderBuilder(signer)
 
@@ -306,6 +315,7 @@ class TestOrderBuilder(TestCase):
 
             amount = amount + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_buy_0_1(self):
         builder = OrderBuilder(signer)
 
@@ -328,6 +338,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_buy_0_01(self):
         builder = OrderBuilder(signer)
 
@@ -350,6 +361,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_buy_0_001(self):
         builder = OrderBuilder(signer)
 
@@ -372,6 +384,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_buy_0_0001(self):
         builder = OrderBuilder(signer)
 
@@ -394,6 +407,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_sell_0_1(self):
         builder = OrderBuilder(signer)
 
@@ -416,6 +430,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_sell_0_01(self):
         builder = OrderBuilder(signer)
 
@@ -438,6 +453,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_sell_0_001(self):
         builder = OrderBuilder(signer)
 
@@ -460,6 +476,7 @@ class TestOrderBuilder(TestCase):
 
             size = size + delta_size
 
+    @pytest.mark.slow
     def test_get_order_amounts_sell_0_0001(self):
         builder = OrderBuilder(signer)
 
