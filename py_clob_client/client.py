@@ -126,7 +126,7 @@ class ClobClient:
         creds: ApiCreds = None,
         signature_type: int = None,
         funder: str = None,
-builder_config: BuilderConfig = None,
+        builder_config: BuilderConfig = None,
         httpx_client: httpx.AsyncClient = None,
     ):
         """
@@ -309,7 +309,7 @@ builder_config: BuilderConfig = None,
         headers = create_level_2_headers(self.signer, self.creds, request_args)
         return await self.client.delete("{}{}".format(self.host, DELETE_API_KEY), headers=headers)
 
-async def create_readonly_api_key(self) -> ReadonlyApiKeyResponse:
+    async def create_readonly_api_key(self) -> ReadonlyApiKeyResponse:
         """
         Creates a new readonly API key for a user
         Level 2 Auth required
@@ -427,7 +427,7 @@ async def create_readonly_api_key(self) -> ReadonlyApiKeyResponse:
 
         return result["neg_risk"]
 
-async def get_fee_rate_bps(self, token_id: str) -> int:
+    async def get_fee_rate_bps(self, token_id: str) -> int:
         if token_id in self.__fee_rates:
             return self.__fee_rates[token_id]
 
@@ -453,7 +453,7 @@ async def get_fee_rate_bps(self, token_id: str) -> int:
             tick_size = min_tick_size
         return tick_size
 
-async def __resolve_fee_rate(self, token_id: str, user_fee_rate: int = None) -> int:
+    async def __resolve_fee_rate(self, token_id: str, user_fee_rate: int = None) -> int:
         market_fee_rate_bps = await self.get_fee_rate_bps(token_id)
         # If both fee rate on the market and the user supplied fee rate are non-zero, validate that they match
         # else return the market fee rate
@@ -531,7 +531,7 @@ async def __resolve_fee_rate(self, token_id: str, user_fee_rate: int = None) -> 
             options.tick_size if options else None,
         )
 
-if order_args.price is None or order_args.price <= 0:
+        if order_args.price is None or order_args.price <= 0:
             order_args.price = await self.calculate_market_price(
                 order_args.token_id,
                 order_args.side,
@@ -569,7 +569,7 @@ if order_args.price is None or order_args.price <= 0:
             ),
         )
 
-async def post_orders(self, args: list[PostOrdersArgs]):
+    async def post_orders(self, args: list[PostOrdersArgs]):
         """
         Posts orders
         """
@@ -625,7 +625,7 @@ async def post_orders(self, args: list[PostOrdersArgs]):
                     headers=builder_headers,
                     data=request_args.serialized_body,
                 )
-return await post(
+        return await post(
             "{}{}".format(self.host, POST_ORDER),
             headers=headers,
             data=request_args.serialized_body,
@@ -648,7 +648,7 @@ return await post(
         self.assert_level_2_auth()
         body = {"orderID": order_id}
 
-request_args = RequestArgs(
+        request_args = RequestArgs(
             method="DELETE",
             request_path=CANCEL,
             body=body,
@@ -675,7 +675,7 @@ request_args = RequestArgs(
             body=body,
             serialized_body=serialized,
         )
-headers = create_level_2_headers(self.signer, self.creds, request_args)
+        headers = create_level_2_headers(self.signer, self.creds, request_args)
         return await self.client.delete(
             "{}{}".format(self.host, CANCEL_ORDERS), headers=headers, data=serialized
         )
@@ -721,7 +721,7 @@ headers = create_level_2_headers(self.signer, self.creds, request_args)
             serialized_body=serialized,
         )
         headers = create_level_2_headers(self.signer, self.creds, request_args)
-return await self.client.delete(
+        return await self.client.delete(
             "{}{}".format(self.host, CANCEL_MARKET_ORDERS),
             headers=headers,
             data=serialized,
@@ -845,7 +845,7 @@ return await self.client.delete(
             return L1
         return L0
 
-def _generate_builder_headers(self, request_args: RequestArgs, headers: dict):
+    def _generate_builder_headers(self, request_args: RequestArgs, headers: dict):
         """
         Generates builder headers and attaches them to the L2 Header
         """
@@ -960,7 +960,7 @@ def _generate_builder_headers(self, request_args: RequestArgs, headers: dict):
             body=body,
             serialized_body=serialized,
         )
-headers = create_level_2_headers(self.signer, self.creds, request_args)
+        headers = create_level_2_headers(self.signer, self.creds, request_args)
         return await self.client.post(
             "{}{}".format(self.host, ARE_ORDERS_SCORING),
             headers=headers,
@@ -1011,7 +1011,7 @@ headers = create_level_2_headers(self.signer, self.creds, request_args)
         """
         return await self.client.get("{}{}{}".format(self.host, GET_MARKET_TRADES_EVENTS, condition_id))
 
-async def get_builder_trades(self, params: TradeParams = None, next_cursor="MA=="):
+    async def get_builder_trades(self, params: TradeParams = None, next_cursor="MA=="):
         """
         Get trades originated by the builder
         """
@@ -1052,7 +1052,7 @@ async def get_builder_trades(self, params: TradeParams = None, next_cursor="MA==
         else:
             if book.bids is None:
                 raise Exception("no match")
-return self.builder.calculate_sell_market_price(
+            return self.builder.calculate_sell_market_price(
                 book.bids, amount, order_type
             )
 
@@ -1061,7 +1061,7 @@ return self.builder.calculate_sell_market_price(
         Get the price history for a given token_id with interval.
         startTs/endTs are mutually exclusive to interval.
         """
-return await self.client.get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
+        return await self.client.get("{}{}?market={}&interval={}&fidelity={}".format(self.host, GET_PRICE_HISTORY, token_id, interval, fidelity))
 
     async def get_price_history_with_timestamps(self, token_id: str, startTs: int, endTs: int, fidelity: str):
         """

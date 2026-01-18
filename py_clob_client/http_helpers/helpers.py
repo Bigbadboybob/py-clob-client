@@ -102,6 +102,19 @@ def set_client(client_helper: ClientHelper) -> None:
     _client_helper =  client_helper
 
 
+# Module-level async functions for backward compatibility
+async def get(endpoint, headers=None, data=None):
+    return await get_client().get(endpoint, headers, data)
+
+
+async def post(endpoint, headers=None, data=None):
+    return await get_client().post(endpoint, headers, data)
+
+
+async def delete(endpoint, headers=None, data=None):
+    return await get_client().delete(endpoint, headers, data)
+
+
 def put(endpoint, headers=None, data=None):
     return request(endpoint, PUT, headers, data)
 
